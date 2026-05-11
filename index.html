@@ -272,7 +272,6 @@
         // URL da sua Google Web App
         const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxQKq23keZ93y5Q7RiUI5aAy3H9TLalyy5didWJeWQ7TsRZD_DlEN69txAcfdZ7Bc25/exec"; 
         const SHEET_ID = "14rNpoqgQx_aA6XXBzvwdtuhcEYLftJWF6iVm0Vydies";
-        const SHEET_NAME = "Planeamento";
 
         let scores = new Array(10).fill(null);
         const subLabels = [
@@ -283,39 +282,58 @@
             "5.1 Disciplina (Hábito)", "5.2 Disciplina (Melhoria)"
         ];
 
-        // Carregar dados de Planeamento
+        // Carregar dados de Planeamento via Google Sheets CSV export
         async function loadPlaneamento() {
             try {
-                const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}?key=AIzaSyBKGn5ZRMQY4JOwWPkF3yXN6tQ9-yF5Hts`;
-                const response = await fetch(url);
-                const data = await response.json();
+                const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Planeamento`;
+                const response = await fetch(csvUrl);
+                const csv = await response.text();
                 
-                if (data.values && data.values.length > 0) {
-                    const headers = data.values[0];
+                const lines = csv.trim().split('\n');
+                if (lines.length > 0) {
+                    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
                     const dataIndex = headers.indexOf('Data');
                     const localIndex = headers.indexOf('Local');
+                    const statusIndex = headers.indexOf('Status');
                     
                     const container = document.getElementById('planeamento-modal-container');
                     container.innerHTML = '';
                     
-                    for (let i = 1; i < data.values.length; i++) {
-                        const row = data.values[i];
-                        const dataVal = row[dataIndex] || 'N/A';
-                        const localVal = row[localIndex] || 'N/A';
+                    for (let i = 1; i < lines.length; i++) {
+                        const cells = lines[i].split(',').map(c => c.trim().replace(/"/g, ''));
+                        const dataVal = cells[dataIndex] || 'N/A';
+                        const localVal = cells[localIndex] || 'N/A';
+                        const statusVal = cells[statusIndex] || '';
                         
-                        const card = document.createElement('div');
-                        card.className = 'bg-gray-50 border border-gray-100 rounded-lg p-3';
-                        card.innerHTML = `
-                            <p class="text-[11px] font-bold text-gray-700 mb-1">Data: <span class="font-normal">${dataVal}</span></p>
-                            <p class="text-[11px] font-bold text-gray-700">Local: <span class="font-normal">${localVal}</span></p>
-                        `;
-                        container.appendChild(card);
+                        if (dataVal && dataVal !== 'N/A') {
+                            const isChecked = statusVal.toLowerCase() === 'realizado' || statusVal.toLowerCase() === 'sim';
+                            
+                            const card = document.createElement('div');
+                            card.className = 'bg-gray-50 border border-gray-100 rounded-lg p-3 flex items-start gap-3';
+                            card.innerHTML = `
+                                <input type="checkbox" ${isChecked ? 'checked' : ''} class="mt-1 w-4 h-4 cursor-pointer" onchange="updatePlaneamentoStatus('${dataVal}', '${localVal}', this)">
+                                <div class="flex-1">
+                                    <p class="text-[11px] font-bold text-gray-700 mb-1">Data: <span class="font-normal">${dataVal}</span></p>
+                                    <p class="text-[11px] font-bold text-gray-700">Local: <span class="font-normal">${localVal}</span></p>
+                                </div>
+                            `;
+                            container.appendChild(card);
+                        }
+                    }
+                    
+                    if (container.innerHTML === '') {
+                        container.innerHTML = '<div class="text-gray-400 text-sm text-center">Sem dados de Planeamento.</div>';
                     }
                 }
             } catch (error) {
                 console.error('Erro ao carregar Planeamento:', error);
                 document.getElementById('planeamento-modal-container').innerHTML = '<div class="text-red-400 text-sm text-center">Erro ao carregar dados.</div>';
             }
+        }
+
+        function updatePlaneamentoStatus(data, local, checkbox) {
+            const status = checkbox.checked ? 'Realizado' : '';
+            console.log(`Auditoria marcada: ${data} - ${local} (${status})`);
         }
 
         function openPlaneamentoModal() {
