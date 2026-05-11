@@ -1,512 +1,105 @@
-<!DOCTYPE html>
-<html lang="pt">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Auditoria 5S Somengil</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        body {
-            background: radial-gradient(circle at center, rgba(81, 184, 234, 1) 0%, rgba(0, 0, 0, 1) 100%);
-            background-attachment: fixed;
-            -webkit-tap-highlight-color: transparent;
-        }
+function doPost(e) {
+  try {
+    var data;
+    
+    Logger.log("e.postData.contents: " + e.postData.contents);
+    Logger.log("e.parameter: " + JSON.stringify(e.parameter));
+    
+    // Tenta ler como formulário (form submission URL-encoded)
+    if (e.parameter && e.parameter.data) {
+      try {
+        var decodedData = decodeURIComponent(e.parameter.data);
+        Logger.log("Dados decodificados: " + decodedData);
+        data = JSON.parse(decodedData);
+      } catch(err) {
+        Logger.log("Erro ao fazer parse de parameter: " + err);
+      }
+    }
+    
+    // Tenta ler como JSON (from fetch)
+    if (!data && e.postData && e.postData.contents && e.postData.contents.length > 0) {
+      try {
+        data = JSON.parse(e.postData.contents);
+      } catch(err) {
+        Logger.log("Erro ao fazer parse de postData: " + err);
+      }
+    }
+    
+    if (!data) {
+      throw new Error("Sem dados recebidos. Parâmetros: " + JSON.stringify(e.parameter));
+    }
+    
+    Logger.log("Dados finais: " + JSON.stringify(data));
+    
+    // Se for atualização de Planeamento
+    if (data.action === 'updatePlaneamento') {
+      var planeamentoSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Planeamento');
+      var range = planeamentoSheet.getDataRange();
+      var values = range.getValues();
+      
+      Logger.log("Total de linhas no Planeamento: " + values.length);
+      
+      // Encontra as colunas ID e Status
+      var headers = values[0];
+      var idColIndex = -1;
+      var statusColIndex = -1;
+      
+      for (var h = 0; h < headers.length; h++) {
+        if (headers[h] === 'ID') idColIndex = h;
+        if (headers[h] === 'Status') statusColIndex = h;
+      }
+      
+      Logger.log("Índices - ID: " + idColIndex + ", Status: " + statusColIndex);
+      Logger.log("Procurando ID: '" + data.id + "'");
+      
+      // Procura a linha com ID correspondente
+      for (var i = 1; i < values.length; i++) {
+        var sheetId = String(values[i][idColIndex]).trim();
+        var searchId = String(data.id).trim();
         
-        .check-card {
-            transition: transform 0.1s ease;
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            background-color: rgba(255, 255, 255, 0.92);
-        }
-
-        .btn-5s:active {
-            transform: scale(0.97);
-        }
-
-        .btn-active-sim {
-            background-color: #16a34a !important;
-            border-color: #15803d !important;
-            color: #ffffff !important;
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
-        }
+        Logger.log("Linha " + i + ": ID='" + sheetId + "'");
         
-        .btn-active-nao {
-            background-color: #dc2626 !important;
-            border-color: #b91c1c !important;
-            color: #ffffff !important;
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        if (sheetId === searchId) {
+          Logger.log("ENCONTRADO na linha " + (i + 1) + "! Atualizando STATUS para: '" + data.status + "'");
+          planeamentoSheet.getRange(i + 1, statusColIndex + 1).setValue(data.status);
+          
+          return HtmlService.createHtmlOutput('OK');
         }
-
-        select {
-            appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%234b5563'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 0.75rem center;
-            background-size: 1.2em 1.2em;
-        }
-
-        .main-container {
-            padding-bottom: 180px;
-        }
-
-        /* Loading Spinner */
-        .spinner {
-            border: 3px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            border-top: 3px solid #fff;
-            width: 20px;
-            height: 20px;
-            animation: spin 1s linear infinite;
-            display: inline-block;
-            vertical-align: middle;
-            margin-right: 8px;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    </style>
-</head>
-<body class="min-h-screen font-sans text-gray-900">
-
-    <header class="p-4 sm:p-6 mb-2">
-        <div class="flex justify-center items-center py-4 cursor-pointer" onclick="openPlaneamentoModal()">
-            <img src="https://res.cloudinary.com/djxxk3ipz/image/upload/v1776687956/somengil_logo_white_wzwrm0.png" 
-                 alt="Somengil Logo" 
-                 class="w-40 sm:w-48 h-auto"
-                 onerror="this.parentElement.innerHTML='<h1 class=text-white font-bold>SOMENGIL</h1>'">
-        </div>
-        <h1 class="text-lg sm:text-xl font-bold text-center uppercase tracking-widest text-white">Auditoria 5S Pro</h1>
-        <p class="text-blue-100 text-center text-[10px] sm:text-xs opacity-70">Checklist de Posto de Trabalho</p>
-    </header>
-
-    <main class="max-w-md mx-auto px-4 main-container">
-        
-        <!-- Seleção do Posto -->
-        <div class="bg-white/90 rounded-2xl p-4 shadow-xl mb-6 border border-white/20">
-            <label class="block text-gray-500 text-[10px] font-black mb-1 uppercase tracking-widest">Identificação do Posto</label>
-            <select id="posto-id" class="w-full bg-transparent border-none rounded p-2 focus:ring-0 outline-none text-xl font-bold text-blue-900">
-                <option value="" disabled selected>Selecionar Posto...</option>
-                <option value="PC1">PC1</option>
-                <option value="PS1">PS1</option>
-                <option value="PS2">PS2</option>
-                <option value="PS3">PS3</option>
-                <option value="PS4">PS4</option>
-                <option value="PS5">PS5</option>
-                <option value="PA1">PA1</option>
-                <option value="PA2">PA2</option>
-                <option value="PM1">PM1</option>
-                <option value="PM2">PM2</option>
-                <option value="PM3">PM3</option>
-                <option value="PM4">PM4</option>
-                <option value="PM5">PM5</option>
-                <option value="PM6">PM6</option>
-                <option value="PL1">PL1</option>
-            </select>
-        </div>
-
-        <div id="checklist-container" class="space-y-6">
-            <!-- 1. Seiri -->
-            <section class="check-card rounded-2xl overflow-hidden shadow-2xl">
-                <div class="bg-red-600 p-3 text-white font-bold text-xs uppercase tracking-tighter">1. SEIRI (Utilização)</div>
-                <div class="p-4 space-y-5">
-                    <div class="question-block">
-                        <p class="text-sm font-bold text-gray-800 mb-3 leading-snug">1.1. Existem objetos desnecessários ou obsoletos no posto?</p>
-                        <div class="grid grid-cols-2 gap-3">
-                            <button onclick="setScore(0, 1)" class="btn-5s py-4 rounded-xl border-2 border-gray-100 bg-gray-50 text-[10px] font-black uppercase tracking-tighter" data-index="0" data-value="1">Não (Limpo)</button>
-                            <button onclick="setScore(0, 0)" class="btn-5s py-4 rounded-xl border-2 border-gray-100 bg-gray-50 text-[10px] font-black uppercase tracking-tighter" data-index="0" data-value="0">Sim (Lixo)</button>
-                        </div>
-                    </div>
-                    <div class="pt-3 border-t border-gray-100">
-                        <p class="text-sm font-bold text-gray-800 mb-3 leading-snug">1.2. A quantidade de material em stock é a correta?</p>
-                        <div class="grid grid-cols-2 gap-3">
-                            <button onclick="setScore(1, 1)" class="btn-5s py-4 rounded-xl border-2 border-gray-100 bg-gray-50 text-[10px] font-black uppercase tracking-tighter" data-index="1" data-value="1">Sim</button>
-                            <button onclick="setScore(1, 0)" class="btn-5s py-4 rounded-xl border-2 border-gray-100 bg-gray-50 text-[10px] font-black uppercase tracking-tighter" data-index="1" data-value="0">Não</button>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- 2. Seiton -->
-            <section class="check-card rounded-2xl overflow-hidden shadow-2xl">
-                <div class="bg-yellow-500 p-3 text-white font-bold text-xs uppercase tracking-tighter">2. SEITON (Organização)</div>
-                <div class="p-4 space-y-5">
-                    <div class="question-block">
-                        <p class="text-sm font-bold text-gray-800 mb-3 leading-snug">2.1. Ferramentas têm local definido e identificado?</p>
-                        <div class="grid grid-cols-2 gap-3">
-                            <button onclick="setScore(2, 1)" class="btn-5s py-4 rounded-xl border-2 border-gray-100 bg-gray-50 text-[10px] font-black uppercase tracking-tighter" data-index="2" data-value="1">Sim</button>
-                            <button onclick="setScore(2, 0)" class="btn-5s py-4 rounded-xl border-2 border-gray-100 bg-gray-50 text-[10px] font-black uppercase tracking-tighter" data-index="2" data-value="0">Não</button>
-                        </div>
-                    </div>
-                    <div class="pt-3 border-t border-gray-100">
-                        <p class="text-sm font-bold text-gray-800 mb-3 leading-snug">2.2. O fluxo de trabalho é lógico e sem obstruções?</p>
-                        <div class="grid grid-cols-2 gap-3">
-                            <button onclick="setScore(3, 1)" class="btn-5s py-4 rounded-xl border-2 border-gray-100 bg-gray-50 text-[10px] font-black uppercase tracking-tighter" data-index="3" data-value="1">Sim</button>
-                            <button onclick="setScore(3, 0)" class="btn-5s py-4 rounded-xl border-2 border-gray-100 bg-gray-50 text-[10px] font-black uppercase tracking-tighter" data-index="3" data-value="0">Não</button>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- 3. Seiso -->
-            <section class="check-card rounded-2xl overflow-hidden shadow-2xl">
-                <div class="bg-green-600 p-3 text-white font-bold text-xs uppercase tracking-tighter">3. SEISO (Limpeza)</div>
-                <div class="p-4 space-y-5">
-                    <div class="question-block">
-                        <p class="text-sm font-bold text-gray-800 mb-3 leading-snug">3.1. Posto isento de óleos, pó, aparas ou lixo?</p>
-                        <div class="grid grid-cols-2 gap-3">
-                            <button onclick="setScore(4, 1)" class="btn-5s py-4 rounded-xl border-2 border-gray-100 bg-gray-50 text-[10px] font-black uppercase tracking-tighter" data-index="4" data-value="1">Sim</button>
-                            <button onclick="setScore(4, 0)" class="btn-5s py-4 rounded-xl border-2 border-gray-100 bg-gray-50 text-[10px] font-black uppercase tracking-tighter" data-index="4" data-value="0">Não</button>
-                        </div>
-                    </div>
-                    <div class="pt-3 border-t border-gray-100">
-                        <p class="text-sm font-bold text-gray-800 mb-3 leading-snug">3.2. Equipamentos de limpeza disponíveis?</p>
-                        <div class="grid grid-cols-2 gap-3">
-                            <button onclick="setScore(5, 1)" class="btn-5s py-4 rounded-xl border-2 border-gray-100 bg-gray-50 text-[10px] font-black uppercase tracking-tighter" data-index="5" data-value="1">Sim</button>
-                            <button onclick="setScore(5, 0)" class="btn-5s py-4 rounded-xl border-2 border-gray-100 bg-gray-50 text-[10px] font-black uppercase tracking-tighter" data-index="5" data-value="0">Não</button>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- 4. Seiketsu -->
-            <section class="check-card rounded-2xl overflow-hidden shadow-2xl">
-                <div class="bg-blue-600 p-3 text-white font-bold text-xs uppercase tracking-tighter">4. SEIKETSU (Padronização)</div>
-                <div class="p-4 space-y-5">
-                    <div class="question-block">
-                        <p class="text-sm font-bold text-gray-800 mb-3 leading-snug">4.1. O padrão visual (standard) está a ser respeitado?</p>
-                        <div class="grid grid-cols-2 gap-3">
-                            <button onclick="setScore(6, 1)" class="btn-5s py-4 rounded-xl border-2 border-gray-100 bg-gray-50 text-[10px] font-black uppercase tracking-tighter" data-index="6" data-value="1">Sim</button>
-                            <button onclick="setScore(6, 0)" class="btn-5s py-4 rounded-xl border-2 border-gray-100 bg-gray-50 text-[10px] font-black uppercase tracking-tighter" data-index="6" data-value="0">Não</button>
-                        </div>
-                    </div>
-                    <div class="pt-3 border-t border-gray-100">
-                        <p class="text-sm font-bold text-gray-800 mb-3 leading-snug">4.2. Contentores e zonas estão identificados?</p>
-                        <div class="grid grid-cols-2 gap-3">
-                            <button onclick="setScore(7, 1)" class="btn-5s py-4 rounded-xl border-2 border-gray-100 bg-gray-50 text-[10px] font-black uppercase tracking-tighter" data-index="7" data-value="1">Sim</button>
-                            <button onclick="setScore(7, 0)" class="btn-5s py-4 rounded-xl border-2 border-gray-100 bg-gray-50 text-[10px] font-black uppercase tracking-tighter" data-index="7" data-value="0">Não</button>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- 5. Shitsuke -->
-            <section class="check-card rounded-2xl overflow-hidden shadow-2xl">
-                <div class="bg-purple-700 p-3 text-white font-bold text-xs uppercase tracking-tighter">5. SHITSUKE (Disciplina)</div>
-                <div class="p-4 space-y-5">
-                    <div class="question-block">
-                        <p class="text-sm font-bold text-gray-800 mb-3 leading-snug">5.1. O colaborador realiza o 5S diariamente?</p>
-                        <div class="grid grid-cols-2 gap-3">
-                            <button onclick="setScore(8, 1)" class="btn-5s py-4 rounded-xl border-2 border-gray-100 bg-gray-50 text-[10px] font-black uppercase tracking-tighter" data-index="8" data-value="1">Sim</button>
-                            <button onclick="setScore(8, 0)" class="btn-5s py-4 rounded-xl border-2 border-gray-100 bg-gray-50 text-[10px] font-black uppercase tracking-tighter" data-index="8" data-value="0">Não</button>
-                        </div>
-                    </div>
-                    <div class="pt-3 border-t border-gray-100">
-                        <p class="text-sm font-bold text-gray-800 mb-3 leading-snug">5.2. Ações da auditoria anterior foram cumpridas?</p>
-                        <div class="grid grid-cols-2 gap-3">
-                            <button onclick="setScore(9, 1)" class="btn-5s py-4 rounded-xl border-2 border-gray-100 bg-gray-50 text-[10px] font-black uppercase tracking-tighter" data-index="9" data-value="1">Sim</button>
-                            <button onclick="setScore(9, 0)" class="btn-5s py-4 rounded-xl border-2 border-gray-100 bg-gray-50 text-[10px] font-black uppercase tracking-tighter" data-index="9" data-value="0">Não</button>
-                        </div>
-                    </div>
-                </div>
-            </section>
-        </div>
-
-        <!-- Barra de Resultados Fixo (Mobile Bottom) -->
-        <div class="fixed bottom-0 left-0 right-0 p-4 bg-black/60 backdrop-blur-xl border-t border-white/10 z-40">
-            <div class="max-w-md mx-auto">
-                <div class="flex justify-between items-center mb-3 px-1">
-                    <div class="flex flex-col">
-                        <span class="text-blue-300 uppercase text-[9px] font-black tracking-widest leading-none mb-1">Performance Total</span>
-                        <div class="text-3xl font-black text-white leading-none" id="total-score">0%</div>
-                    </div>
-                    <div class="text-right">
-                        <span id="status-label" class="inline-block px-3 py-1.5 rounded-lg text-[10px] font-black bg-white/10 text-white uppercase tracking-tight">Aguardando...</span>
-                    </div>
-                </div>
-                
-                <button id="main-submit-btn" onclick="generateAndSubmit()" class="w-full bg-blue-500 active:bg-blue-600 text-white font-black py-4 rounded-2xl shadow-lg transition-all text-xs uppercase tracking-widest flex items-center justify-center disabled:opacity-50">
-                    <span id="btn-text">SUBMETER AUDITORIA</span>
-                </button>
-            </div>
-        </div>
-
-        <!-- Modal de Sucesso / Relatório -->
-        <div id="modal" class="hidden fixed inset-0 bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div class="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-hidden scale-in">
-                <div class="mb-4 text-center">
-                    <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-3">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
-                        </svg>
-                    </div>
-                    <h3 class="text-xl font-black text-gray-900 leading-none">Dados Enviados!</h3>
-                    <p class="text-gray-500 text-[10px] uppercase font-bold mt-2 tracking-tight">Auditado com sucesso na Sheet</p>
-                </div>
-                
-                <textarea id="report-text" class="w-full h-40 border border-gray-100 rounded-2xl p-4 text-[11px] font-mono bg-gray-50 mb-5 focus:outline-none resize-none" readonly></textarea>
-                
-                <div class="grid grid-cols-2 gap-3">
-                    <button onclick="copyReport()" id="copy-btn" class="bg-blue-600 text-white font-bold py-4 rounded-2xl text-[10px] uppercase tracking-wider">Copiar Texto</button>
-                    <button onclick="closeModal()" class="bg-gray-100 text-gray-700 font-bold py-4 rounded-2xl text-[10px] uppercase tracking-wider">Fechar</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Modal de Planeamento -->
-        <div id="planeamento-modal" class="hidden fixed inset-0 bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div class="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-hidden">
-                <div class="mb-4 text-center">
-                    <h3 class="text-xl font-black text-gray-900 leading-none">Planeamento</h3>
-                    <p class="text-gray-500 text-[10px] uppercase font-bold mt-2 tracking-tight">Próximas Auditorias</p>
-                </div>
-                
-                <div id="planeamento-modal-container" class="space-y-3 max-h-96 overflow-y-auto mb-5">
-                    <div class="text-gray-400 text-sm text-center">Carregando dados...</div>
-                </div>
-                
-                <button onclick="closePlaneamentoModal()" class="w-full bg-gray-100 text-gray-700 font-bold py-4 rounded-2xl text-[10px] uppercase tracking-wider">Fechar</button>
-            </div>
-        </div>
-
-    </main>
-
-    <script>
-        // URL da sua Google Web App
-        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxUkYe9OtfuPJAKihHRjroXE07wqTI_bn_pbLIkroIDLFPIX9XUzKTVNMlmaieG4a0f/exec"; 
-        const SHEET_ID = "14rNpoqgQx_aA6XXBzvwdtuhcEYLftJWF6iVm0Vydies";
-
-        let scores = new Array(10).fill(null);
-        const subLabels = [
-            "1.1 Utilização (Objetos)", "1.2 Utilização (Stock)",
-            "2.1 Organização (Lugares)", "2.2 Organização (Fluxo)",
-            "3.1 Limpeza (Ambiente)", "3.2 Limpeza (Equipamento)",
-            "4.1 Padronização (Standard)", "4.2 Padronização (Identificação)",
-            "5.1 Disciplina (Hábito)", "5.2 Disciplina (Melhoria)"
-        ];
-
-        // Carregar dados de Planeamento via Google Sheets CSV export
-        async function loadPlaneamento() {
-            try {
-                const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Planeamento`;
-                const response = await fetch(csvUrl);
-                const csv = await response.text();
-                
-                const lines = csv.trim().split('\n');
-                if (lines.length > 0) {
-                    // Parse do header
-                    const headerLine = lines[0];
-                    const headers = headerLine.split(',').map(h => h.trim().replace(/"/g, ''));
-                    const dataIndex = headers.indexOf('Data');
-                    const localIndex = headers.indexOf('Local');
-                    const statusIndex = headers.indexOf('Status');
-                    
-                    const container = document.getElementById('planeamento-modal-container');
-                    container.innerHTML = '';
-                    
-                    for (let i = 1; i < lines.length; i++) {
-                        const line = lines[i].trim();
-                        if (!line) continue;
-                        
-                        // Parse CSV mantendo valores entre aspas
-                        const cells = [];
-                        let current = '';
-                        let inQuotes = false;
-                        
-                        for (let j = 0; j < line.length; j++) {
-                            const char = line[j];
-                            if (char === '"') {
-                                inQuotes = !inQuotes;
-                            } else if (char === ',' && !inQuotes) {
-                                cells.push(current.trim().replace(/"/g, ''));
-                                current = '';
-                            } else {
-                                current += char;
-                            }
-                        }
-                        cells.push(current.trim().replace(/"/g, ''));
-                        
-                        const dataVal = cells[dataIndex] || 'N/A';
-                        const localVal = cells[localIndex] || 'N/A';
-                        const statusVal = cells[statusIndex] || '';
-                        
-                        if (dataVal && dataVal !== 'N/A') {
-                            const isChecked = statusVal.toLowerCase() === 'realizado' || statusVal.toLowerCase() === 'sim';
-                            
-                            const card = document.createElement('div');
-                            card.className = 'bg-gray-50 border border-gray-100 rounded-lg p-3 flex items-start gap-3';
-                            card.innerHTML = `
-                                <input type="checkbox" ${isChecked ? 'checked' : ''} class="mt-1 w-4 h-4 cursor-pointer" onchange="updatePlaneamentoStatus('${dataVal.replace(/'/g, "\\'")}', '${localVal.replace(/'/g, "\\'")}', this)">
-                                <div class="flex-1">
-                                    <p class="text-[11px] font-bold text-gray-700 mb-1">Data: <span class="font-normal">${dataVal}</span></p>
-                                    <p class="text-[11px] font-bold text-gray-700">Local: <span class="font-normal">${localVal}</span></p>
-                                </div>
-                            `;
-                            container.appendChild(card);
-                        }
-                    }
-                    
-                    if (container.innerHTML === '') {
-                        container.innerHTML = '<div class="text-gray-400 text-sm text-center">Sem dados de Planeamento.</div>';
-                    }
-                }
-            } catch (error) {
-                console.error('Erro ao carregar Planeamento:', error);
-                document.getElementById('planeamento-modal-container').innerHTML = '<div class="text-red-400 text-sm text-center">Erro ao carregar dados.</div>';
-            }
-        }
-
-        function updatePlaneamentoStatus(data, local, checkbox) {
-            const status = checkbox.checked ? 'Realizado' : '';
-            
-            // Cria um formulário oculto para fazer POST
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = WEB_APP_URL;
-            form.style.display = 'none';
-            
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = 'data';
-            input.value = JSON.stringify({
-                action: 'updatePlaneamento',
-                data: data.trim(),
-                local: local.trim(),
-                status: status
-            });
-            
-            form.appendChild(input);
-            document.body.appendChild(form);
-            form.submit();
-            document.body.removeChild(form);
-            
-            console.log('Formulário enviado para:', data, local, status);
-        }
-
-        function openPlaneamentoModal() {
-            document.getElementById('planeamento-modal').classList.remove('hidden');
-        }
-
-        function closePlaneamentoModal() {
-            document.getElementById('planeamento-modal').classList.add('hidden');
-        }
-
-        function setScore(index, value) {
-            scores[index] = value;
-            const buttons = document.querySelectorAll(`button[data-index="${index}"]`);
-            buttons.forEach(btn => {
-                const btnValue = parseInt(btn.getAttribute('data-value'));
-                if (btnValue === value) {
-                    btn.classList.add(value === 1 ? 'btn-active-sim' : 'btn-active-nao');
-                } else {
-                    btn.classList.remove('btn-active-sim', 'btn-active-nao');
-                }
-            });
-            calculateTotal();
-        }
-
-        function calculateTotal() {
-            const answered = scores.filter(s => s !== null);
-            if (answered.length === 0) return;
-            const sum = answered.reduce((a, b) => a + b, 0);
-            const percentage = Math.round((sum / 10) * 100);
-            const display = document.getElementById('total-score');
-            const statusLabel = document.getElementById('status-label');
-            display.innerText = percentage + '%';
-            
-            if (percentage < 50) {
-                display.className = "text-3xl font-black text-red-400";
-                statusLabel.innerText = "CRÍTICO";
-                statusLabel.className = "inline-block px-3 py-1.5 rounded-lg text-[10px] font-black bg-red-900/50 text-red-200 uppercase tracking-tight";
-            } else if (percentage < 85) {
-                display.className = "text-3xl font-black text-yellow-400";
-                statusLabel.innerText = "REGULAR";
-                statusLabel.className = "inline-block px-3 py-1.5 rounded-lg text-[10px] font-black bg-yellow-900/50 text-yellow-200 uppercase tracking-tight";
-            } else {
-                display.className = "text-3xl font-black text-green-400";
-                statusLabel.innerText = "EXCELENTE";
-                statusLabel.className = "inline-block px-3 py-1.5 rounded-lg text-[10px] font-black bg-green-900/50 text-green-200 uppercase tracking-tight";
-            }
-        }
-
-        async function generateAndSubmit() {
-            const selectEl = document.getElementById('posto-id');
-            const posto = selectEl.value;
-            
-            if (!posto) {
-                alert("Selecione o posto de trabalho!");
-                selectEl.focus();
-                return;
-            }
-
-            const answeredCount = scores.filter(s => s !== null).length;
-            if (answeredCount < 10) {
-                alert(`Responda a todas as 10 questões (${answeredCount}/10 completas).`);
-                return;
-            }
-
-            const total = document.getElementById('total-score').innerText;
-            const status = document.getElementById('status-label').innerText;
-            
-            const payload = {
-                posto: posto,
-                pontuacao: total,
-                estado: status,
-                scores: scores
-            };
-
-            const btn = document.getElementById('main-submit-btn');
-            const btnText = document.getElementById('btn-text');
-            
-            // UI Loading State
-            btn.disabled = true;
-            btnText.innerHTML = '<span class="spinner"></span> A ENVIAR...';
-
-            try {
-                // Envio para o Google Apps Script
-                await fetch(WEB_APP_URL, {
-                    method: 'POST',
-                    mode: 'no-cors', 
-                    cache: 'no-cache',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                // Relatório para o Modal
-                let report = `SOMENGIL 5S - ${posto}\n`;
-                report += `Data: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}\n`;
-                report += `Performance: ${total} (${status})\n`;
-                report += `----------------------------\n`;
-                subLabels.forEach((label, i) => {
-                    report += `${label}: ${scores[i] === 1 ? 'OK' : 'X'}\n`;
-                });
-                report += `----------------------------\n`;
-                report += `Auditado com Sucesso.`;
-
-                document.getElementById('report-text').value = report;
-                document.getElementById('modal').classList.remove('hidden');
-
-            } catch (error) {
-                console.error("Erro no envio:", error);
-                alert("Falha ao comunicar com a Google Sheet. Verifique a internet.");
-            } finally {
-                btn.disabled = false;
-                btnText.innerText = "SUBMETER AUDITORIA";
-            }
-        }
-
-        function closeModal() {
-            document.getElementById('modal').classList.add('hidden');
-        }
-
-        function copyReport() {
-            const textArea = document.getElementById('report-text');
-            textArea.select();
-            document.execCommand('copy');
-            const copyBtn = document.getElementById('copy-btn');
-            copyBtn.innerText = "COPIADO!";
-            setTimeout(() => { copyBtn.innerText = "Copiar Texto"; }, 2000);
-        }
-
-        // Inicializar
-        loadPlaneamento();
-    </script>
-</body>
-</html>
+      }
+      
+      Logger.log("ID não encontrado!");
+      return HtmlService.createHtmlOutput('NOT_FOUND');
+    }
+    
+    // Se for auditoria 5S (comportamento original)
+    else {
+      var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+      
+      var row = [
+        new Date(),           // A: Data
+        data.posto,           // B: Posto
+        data.pontuacao,       // C: Pontuação
+        data.estado,          // D: Estado
+        data.scores[0],       // E: 1.1
+        data.scores[1],       // F: 1.2
+        data.scores[2],       // G: 2.1
+        data.scores[3],       // H: 2.2
+        data.scores[4],       // I: 3.1
+        data.scores[5],       // J: 3.2
+        data.scores[6],       // K: 4.1
+        data.scores[7],       // L: 4.2
+        data.scores[8],       // M: 5.1
+        data.scores[9],       // N: 5.2
+        JSON.stringify(data)  // O: Backup JSON
+      ];
+      
+      sheet.appendRow(row);
+      
+      return HtmlService.createHtmlOutput('OK');
+    }
+      
+  } catch (f) {
+    Logger.log("ERRO: " + f.toString());
+    return HtmlService.createHtmlOutput('ERROR: ' + f.toString());
+  }
+}
