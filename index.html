@@ -367,14 +367,11 @@
             
             fetch(WEB_APP_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'text/plain' },
                 body: JSON.stringify(payload)
             })
-            .then(response => {
-                console.log('Status resposta:', response.status);
-                return response.json();
-            })
-            .then(result => console.log('Resultado:', result))
+            .then(response => console.log('Enviado com sucesso'))
             .catch(error => console.error('Erro:', error));
         }
 
