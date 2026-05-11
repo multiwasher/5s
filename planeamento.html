@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planeamento 5S - 2026</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: radial-gradient(circle at top right, rgba(81, 184, 234, 0.8) 0%, rgba(0, 0, 0, 1) 100%);
+            background-attachment: fixed;
+            color: white;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+        .glass-card:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-2px);
+        }
+        .status-badge {
+            font-size: 0.65rem;
+            font-weight: 900;
+            padding: 2px 8px;
+            border-radius: 99px;
+            text-transform: uppercase;
+        }
+        .status-waiting { background: rgba(156, 163, 175, 0.2); color: #d1d5db; }
+        .status-today { background: #3b82f6; color: white; animation: pulse 2s infinite; }
+        .status-past { background: rgba(34, 197, 94, 0.2); color: #86efac; }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body class="min-h-screen font-sans pb-10">
+
+    <header class="p-6 text-center">
+        <img src="https://res.cloudinary.com/djxxk3ipz/image/upload/v1776687956/somengil_logo_white_wzwrm0.png" class="w-32 mx-auto mb-4" alt="Somengil">
+        <h1 class="text-2xl font-black uppercase tracking-widest">Cronograma 2026</h1>
+        <p class="text-blue-300 text-xs mt-1 opacity-80 uppercase font-bold">Plano de Auditorias 5S</p>
+    </header>
+
+    <div class="max-w-xl mx-auto px-4">
+        <!-- Search & Stats -->
+        <div class="flex gap-4 mb-6">
+            <input type="text" id="searchInput" placeholder="Procurar posto ou data..." 
+                   class="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-white/30">
+            <div class="glass-card px-4 py-2 rounded-xl flex flex-col justify-center items-center">
+                <span class="text-[9px] font-bold opacity-50">TOTAL</span>
+                <span id="count" class="text-xl font-black text-blue-400">0</span>
+            </div>
+        </div>
+
+        <!-- Timeline Container -->
+        <div id="timeline" class="space-y-3">
+            <!-- Os itens serão gerados pelo JS -->
+        </div>
+    </div>
+
+    <script>
+        const planData = [
+            { date: "2026-01-06", valor: "PM3" },
+            { date: "2026-02-11", valor: "PA1" },
+            { date: "2026-03-08", valor: "PC1" },
+            { date: "2026-05-10", valor: "PM1" },
+            { date: "2026-05-11", valor: "PM5" },
+            { date: "2026-05-18", valor: "PS2" },
+            { date: "2026-05-25", valor: "PA1" },
+            { date: "2026-06-15", valor: "PS3" },
+            { date: "2026-06-22", valor: "PM4" },
+            { date: "2026-06-29", valor: "PM1" },
+            { date: "2026-07-07", valor: "PM2" },
+            { date: "2026-07-09", valor: "PC1" },
+            { date: "2026-07-13", valor: "PS1" },
+            { date: "2026-07-20", valor: "PM6" },
+            { date: "2026-07-27", valor: "PS4" },
+            { date: "2026-08-06", valor: "PL1" },
+            { date: "2026-08-17", valor: "PS5" },
+            { date: "2026-08-24", valor: "PS3" },
+            { date: "2026-08-31", valor: "PM5" },
+            { date: "2026-09-11", valor: "PM2" },
+            { date: "2026-09-14", valor: "PS2" },
+            { date: "2026-09-21", valor: "PM4" },
+            { date: "2026-09-28", valor: "PS5" },
+            { date: "2026-10-08", valor: "PA2" },
+            { date: "2026-10-19", valor: "PM3" },
+            { date: "2026-10-26", valor: "PS1" },
+            { date: "2026-11-16", valor: "PL1" },
+            { date: "2026-11-23", valor: "PS4" },
+            { date: "2026-11-30", valor: "PA2" },
+            { date: "2026-12-10", valor: "PM6" }
+        ];
+
+        // Ordenar por data
+        planData.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        function renderTimeline(filter = "") {
+            const container = document.getElementById('timeline');
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            
+            let html = "";
+            let count = 0;
+
+            planData.forEach(item => {
+                const itemDate = new Date(item.date);
+                const dateDisplay = itemDate.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                const searchText = (item.valor + dateDisplay).toLowerCase();
+                
+                if (filter && !searchText.includes(filter.toLowerCase())) return;
+
+                count++;
+                
+                let statusClass = "status-waiting";
+                let statusText = "Agendado";
+
+                if (itemDate.getTime() === today.getTime()) {
+                    statusClass = "status-today";
+                    statusText = "Hoje";
+                } else if (itemDate < today) {
+                    statusClass = "status-past";
+                    statusText = "Concluído";
+                }
+
+                html += `
+                    <div class="glass-card rounded-2xl p-4 flex items-center justify-between">
+                        <div class="flex flex-col">
+                            <span class="text-blue-400 font-black text-lg leading-none">${item.valor}</span>
+                            <span class="text-[10px] text-white/50 font-bold mt-1 uppercase tracking-wider">${dateDisplay}</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="status-badge ${statusClass}">${statusText}</span>
+                            <a href="auditoria_5s.html?posto=${item.valor}" class="bg-white/5 hover:bg-blue-500 p-2 rounded-lg transition-colors group">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 opacity-50 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </a>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html || `<p class="text-center opacity-50 py-10">Nenhum posto encontrado.</p>`;
+            document.getElementById('count').innerText = count;
+        }
+
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            renderTimeline(e.target.value);
+        });
+
+        // Iniciar
+        renderTimeline();
+    </script>
+</body>
+</html>
