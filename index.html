@@ -333,7 +333,20 @@
 
         function updatePlaneamentoStatus(data, local, checkbox) {
             const status = checkbox.checked ? 'Realizado' : '';
-            console.log(`Auditoria marcada: ${data} - ${local} (${status})`);
+            
+            const payload = {
+                action: 'updatePlaneamento',
+                data: data,
+                local: local,
+                status: status
+            };
+            
+            fetch(WEB_APP_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).catch(error => console.error('Erro ao atualizar Planeamento:', error));
         }
 
         function openPlaneamentoModal() {
