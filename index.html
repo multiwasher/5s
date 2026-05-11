@@ -270,7 +270,7 @@
 
     <script>
         // URL da sua Google Web App
-        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzioyhisUTJ3EfeabPSFt2qMTVAwoi6-Ss6brMKJapwsREkJUQ62p8RgXnNqDjEaD02/exec"; 
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxg447dfmnzmiszsbUIdF6rmsPEytXQUb90_ZLq1f5FnkxnRFqwGIkO2fXJQHB7vaji/exec"; 
         const SHEET_ID = "14rNpoqgQx_aA6XXBzvwdtuhcEYLftJWF6iVm0Vydies";
 
         let scores = new Array(10).fill(null);
@@ -291,7 +291,9 @@
                 
                 const lines = csv.trim().split('\n');
                 if (lines.length > 0) {
-                    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+                    // Parse do header
+                    const headerLine = lines[0];
+                    const headers = headerLine.split(',').map(h => h.trim().replace(/"/g, ''));
                     const dataIndex = headers.indexOf('Data');
                     const localIndex = headers.indexOf('Local');
                     const statusIndex = headers.indexOf('Status');
@@ -300,7 +302,27 @@
                     container.innerHTML = '';
                     
                     for (let i = 1; i < lines.length; i++) {
-                        const cells = lines[i].split(',').map(c => c.trim().replace(/"/g, ''));
+                        const line = lines[i].trim();
+                        if (!line) continue;
+                        
+                        // Parse CSV mantendo valores entre aspas
+                        const cells = [];
+                        let current = '';
+                        let inQuotes = false;
+                        
+                        for (let j = 0; j < line.length; j++) {
+                            const char = line[j];
+                            if (char === '"') {
+                                inQuotes = !inQuotes;
+                            } else if (char === ',' && !inQuotes) {
+                                cells.push(current.trim().replace(/"/g, ''));
+                                current = '';
+                            } else {
+                                current += char;
+                            }
+                        }
+                        cells.push(current.trim().replace(/"/g, ''));
+                        
                         const dataVal = cells[dataIndex] || 'N/A';
                         const localVal = cells[localIndex] || 'N/A';
                         const statusVal = cells[statusIndex] || '';
@@ -311,7 +333,7 @@
                             const card = document.createElement('div');
                             card.className = 'bg-gray-50 border border-gray-100 rounded-lg p-3 flex items-start gap-3';
                             card.innerHTML = `
-                                <input type="checkbox" ${isChecked ? 'checked' : ''} class="mt-1 w-4 h-4 cursor-pointer" onchange="updatePlaneamentoStatus('${dataVal}', '${localVal}', this)">
+                                <input type="checkbox" ${isChecked ? 'checked' : ''} class="mt-1 w-4 h-4 cursor-pointer" onchange="updatePlaneamentoStatus('${dataVal.replace(/'/g, "\\'")}', '${localVal.replace(/'/g, "\\'")}', this)">
                                 <div class="flex-1">
                                     <p class="text-[11px] font-bold text-gray-700 mb-1">Data: <span class="font-normal">${dataVal}</span></p>
                                     <p class="text-[11px] font-bold text-gray-700">Local: <span class="font-normal">${localVal}</span></p>
@@ -336,17 +358,21 @@
             
             const payload = {
                 action: 'updatePlaneamento',
-                data: data,
-                local: local,
+                data: data.trim(),
+                local: local.trim(),
                 status: status
             };
+            
+            console.log('Enviando:', payload);
             
             fetch(WEB_APP_URL, {
                 method: 'POST',
                 mode: 'no-cors',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
-            }).catch(error => console.error('Erro ao atualizar Planeamento:', error));
+            })
+            .then(response => console.log('Resposta do servidor'))
+            .catch(error => console.error('Erro ao atualizar Planeamento:', error));
         }
 
         function openPlaneamentoModal() {
