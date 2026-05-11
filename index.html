@@ -367,12 +367,15 @@
             
             fetch(WEB_APP_URL, {
                 method: 'POST',
-                mode: 'no-cors',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             })
-            .then(response => console.log('Resposta do servidor'))
-            .catch(error => console.error('Erro ao atualizar Planeamento:', error));
+            .then(response => {
+                console.log('Status resposta:', response.status);
+                return response.json();
+            })
+            .then(result => console.log('Resultado:', result))
+            .catch(error => console.error('Erro:', error));
         }
 
         function openPlaneamentoModal() {
