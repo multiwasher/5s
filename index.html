@@ -270,7 +270,7 @@
 
     <script>
         // URL da sua Google Web App
-        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxsDkaMiDX8Kbcnq4HPKMzhzyRKrfkMyW8mHPXAX92_0EAjE0vHgtbDwNs9eySarkP-/exec"; 
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzqFMHIPeVoz7gF1GTKnx0W6YykUL706XT7q-3CMnuKKh8Mc1xswr78UspjgO29aolu/exec"; 
         const SHEET_ID = "14rNpoqgQx_aA6XXBzvwdtuhcEYLftJWF6iVm0Vydies";
 
         let scores = new Array(10).fill(null);
@@ -356,23 +356,28 @@
         function updatePlaneamentoStatus(data, local, checkbox) {
             const status = checkbox.checked ? 'Realizado' : '';
             
-            const payload = {
+            // Cria um formulário oculto para fazer POST
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = WEB_APP_URL;
+            form.style.display = 'none';
+            
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'data';
+            input.value = JSON.stringify({
                 action: 'updatePlaneamento',
                 data: data.trim(),
                 local: local.trim(),
                 status: status
-            };
+            });
             
-            console.log('Enviando:', payload);
+            form.appendChild(input);
+            document.body.appendChild(form);
+            form.submit();
+            document.body.removeChild(form);
             
-            fetch(WEB_APP_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify(payload)
-            })
-            .then(response => console.log('Enviado com sucesso'))
-            .catch(error => console.error('Erro:', error));
+            console.log('Formulário enviado para:', data, local, status);
         }
 
         function openPlaneamentoModal() {
