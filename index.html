@@ -270,7 +270,7 @@
 
     <script>
         // URL da sua Google Web App
-        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwHamzE8OKkuxGwZB4pYvdUtVqmvc7UUhDBWsdOz-y2rOeWqtIHyeSxrqcF6bYT8oOe/exec"; 
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyUvpx3zhy94Ap-lk7TRHRxWgj0VIPZ9T7WRVl_yp4sVo106TqCu_mULIlfBlpI0-83/exec"; 
         const SHEET_ID = "14rNpoqgQx_aA6XXBzvwdtuhcEYLftJWF6iVm0Vydies";
 
         let scores = new Array(10).fill(null);
@@ -359,36 +359,26 @@
             const id = checkbox.getAttribute('data-id');
             const status = checkbox.checked ? 'Realizado' : '';
             
-            // Cria um formulário oculto para fazer POST
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = WEB_APP_URL;
-            form.style.display = 'none';
-            form.target = 'planeamento-frame'; // Envia para um iframe oculto
-            
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = 'data';
-            input.value = JSON.stringify({
+            const payload = {
                 action: 'updatePlaneamento',
                 id: id,
                 status: status
-            });
+            };
             
-            form.appendChild(input);
-            document.body.appendChild(form);
+            // Enviar como query string na URL (GET request via imagem)
+            const queryString = new URLSearchParams(payload).toString();
+            const imgUrl = WEB_APP_URL + '?' + queryString;
             
-            // Criar iframe oculto se não existir
-            let iframe = document.getElementById('planeamento-frame');
-            if (!iframe) {
-                iframe = document.createElement('iframe');
-                iframe.id = 'planeamento-frame';
-                iframe.style.display = 'none';
-                document.body.appendChild(iframe);
-            }
+            // Criar uma imagem invisível que faz o pedido
+            const img = new Image();
+            img.src = imgUrl;
+            img.style.display = 'none';
+            document.body.appendChild(img);
             
-            form.submit();
-            document.body.removeChild(form);
+            // Remover a imagem após 1 segundo
+            setTimeout(() => {
+                document.body.removeChild(img);
+            }, 1000);
             
             console.log('Enviado - ID:', id, 'Status:', status);
         }
