@@ -270,7 +270,7 @@
 
     <script>
         // URL da sua Google Web App
-        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzbTqqR95wbrcHMO5LR7DwT6ETZxogUg2HtYz4Xl29JzWm3CT94cGVIF-QgQzZLu91-/exec"; 
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxJ8NzqrZ5jFnazGkLXk11sGBqNOUdukzUTPxKnFPkOHQZCLCAFMERFBP16GscZXLGw/exec"; 
         const SHEET_ID = "14rNpoqgQx_aA6XXBzvwdtuhcEYLftJWF6iVm0Vydies";
 
         let scores = new Array(10).fill(null);
@@ -364,6 +364,7 @@
             form.method = 'POST';
             form.action = WEB_APP_URL;
             form.style.display = 'none';
+            form.target = 'planeamento-frame'; // Envia para um iframe oculto
             
             const input = document.createElement('input');
             input.type = 'hidden';
@@ -376,6 +377,16 @@
             
             form.appendChild(input);
             document.body.appendChild(form);
+            
+            // Criar iframe oculto se não existir
+            let iframe = document.getElementById('planeamento-frame');
+            if (!iframe) {
+                iframe = document.createElement('iframe');
+                iframe.id = 'planeamento-frame';
+                iframe.style.display = 'none';
+                document.body.appendChild(iframe);
+            }
+            
             form.submit();
             document.body.removeChild(form);
             
